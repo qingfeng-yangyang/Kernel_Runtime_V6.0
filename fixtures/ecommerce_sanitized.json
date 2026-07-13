@@ -1,1 +1,8 @@
-
+{
+  "order_status": {"order_id": "ORDER-DEMO-001", "status": "运输中"},
+  "logistics_status": {"status": "运输中", "last_event": "包裹已到达脱敏测试转运中心"},
+  "product_info": {"product_id": "PRODUCT-DEMO-001", "name": "脱敏测试商品", "availability": "in_stock"},
+  "shop_policy": {"policy_id": "POLICY-DEMO-001", "content": "脱敏测试政策，不代表真实店铺承诺"},
+  "refund_sop": {"version": "sanitized-v1", "constraints": ["退款前必须核验订单状态"]},
+  "after_sales_sop": {"version": "sanitized-v1", "constraints": ["售后处理前必须核验订单与问题类型"]}
+}
