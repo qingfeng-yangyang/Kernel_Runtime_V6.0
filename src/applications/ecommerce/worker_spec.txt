@@ -1,0 +1,301 @@
+Worker 规范 MVP v1.0（Runtime 对齐修正版）
+
+定位：WORKER_EXECUTING Stage 的执行模块规范
+
+【0. 本次对齐修正摘要】
+
+本版根据 Runtime 规范、Runtime 数据结构规范、Runtime
+核心流程图进行对齐，保留 Worker 作为代码执行模块的定位，不加入 LLM
+式约束。
+
+1. 将 Information Plan 统一为 Plan / Plan Request Group。
+
+2. 删除 Current Shop Scope 作为 Worker 输入的表述；身份与访问范围由
+Runtime Binding、Task Resource Scope 控制。
+
+3. 将“Worker 调用资源”修正为“Worker 向 Runtime 提交 Resource Request
+Group，由 Runtime 调用 Resource Provider”。
+
+4. 将“Worker 写入 Information Store / Log Store”修正为“Worker 返回
+information 与 log_content，由 Runtime 校验后写入 Store / Log”。
+
+5. 将“从 User Store 读取”修正为“Runtime 在 WORKER_EXECUTING Stage 注入
+plan / plan_request_group”。
+
+6. 补充 Module Output Envelope，保证 Worker 输出可被 Runtime
+校验、写入、追溯。
+
+7. 补充失败边界：Worker 不决定 Stage 流转，不处理 Failure Handling。
+
+【1. 身份定义】
+
+Worker 是 Kernel 中的执行模块。
+
+MVP 阶段 Worker 默认为代码模块，用于根据 Plan 执行信息采集，并生成标准
+information。未来 Worker 可以替换为 Agent、工具组合或多 Agent
+执行组，但必须保持对 Runtime 的统一模块接口。
+
+【2. 核心职责】
+
+Worker 只负责执行 Customer Agent 生成的 Plan，不负责制定 Plan。
+
+1. 读取 Runtime 在 WORKER_EXECUTING Stage 注入的 plan。
+
+2. 读取 plan 中的 plan_request_group。
+
+3. 根据 plan_request_group 向 Runtime 提交 Resource Request Group。
+
+4. 接收 Runtime 返回的 Resource Response。
+
+5. 将资源返回结果整理为标准 information。
+
+6. 生成 worker_log 对应的 log_content。
+
+7. 以 Module Output Envelope 形式返回 Runtime。
+
+【3. Runtime Stage 关系】
+
+Worker 只能在 WORKER_EXECUTING Stage 被 Runtime 调度。
+
+Worker 不读取 Stage，不修改 Stage，不决定下一个 Stage。Stage
+流转、失败收束、Recovery Policy 均由 Runtime 处理。
+
+【4. 输入】
+
+Worker 输入由 Runtime 构造并注入。Worker 不主动读取 Store、Log、Task
+Workspace、Data Center 或外部系统。
+
+1. plan：Customer Agent 生成并由 Runtime 写入 Store 的执行计划。
+
+2. plan_request_group：plan 内声明的 Worker 可申请资源范围。
+
+3. resource_response：Runtime 根据 Resource Request 返回的资源结果。
+
+说明：Current Shop Scope 不作为 Worker
+输入。平台、店铺、用户、路径与权限边界由 Runtime Binding、Task Resource
+Scope、Stage Permission 在 Runtime 内部处理。
+
+【5. 资源请求规则】
+
+Worker 不直接调用资源。Worker 只能提交 Resource Request Group。
+
+Worker 请求资源必须同时满足：
+
+1. resource_id 存在于 plan_request_group。
+
+2. resource_id 存在于 Task Resource Scope。
+
+3. resource_id 存在于 Resource Registry。
+
+4. 当前 Stage Permission 允许 Worker 申请该 resource_id。
+
+5. Runtime Binding 校验通过。
+
+Worker 不允许提交路径、数据库地址、API
+地址、账号、Token、权限字段或自然语言资源描述。
+
+【6. 输出】
+
+Worker 不直接写入 Store / Log。Worker 只返回 Module Output Envelope，由
+Runtime 校验后写入 information 与 worker_log。
+
+成功输出结构：
+
+  {
+
+  "stage": "WORKER_EXECUTING",
+
+  "module": "Worker",
+
+  "output": {
+
+  "information": {
+
+  "items": [
+
+  {
+
+  "resource_id": "order_status",
+
+  "status": "success",
+
+  "data": {}
+
+  }
+
+  ]
+
+  }
+
+  },
+
+  "log_content": {
+
+  "status": "success",
+
+  "event": "worker execution completed",
+
+  "error_code": null,
+
+  "error_message": null
+
+  }
+
+  }
+
+失败输出结构：
+
+  {
+
+  "stage": "WORKER_EXECUTING",
+
+  "module": "Worker",
+
+  "output": {
+
+  "information": null
+
+  },
+
+  "log_content": {
+
+  "status": "failed",
+
+  "event": "worker execution failed",
+
+  "error_code": "WORKER_EXECUTION_FAILED",
+
+  "error_message": "Worker failed to generate valid information."
+
+  }
+
+  }
+
+【7. 数据流程】
+
+MVP 标准流程：
+
+  Runtime 读取 Stage.current_stage
+
+  ↓
+
+  Stage = WORKER_EXECUTING
+
+  ↓
+
+  Runtime 调度 Worker
+
+  ↓
+
+  Runtime 注入 plan
+
+  ↓
+
+  Worker 读取 plan_request_group
+
+  ↓
+
+  Worker 提交 Resource Request Group
+
+  ↓
+
+  Runtime 校验并调用 Resource Provider
+
+  ↓
+
+  Runtime 返回 Resource Response
+
+  ↓
+
+  Worker 整理 information
+
+  ↓
+
+  Worker 返回 Module Output Envelope
+
+  ↓
+
+  Runtime 校验 Worker Output
+
+  ↓
+
+  Runtime 写入 information
+
+  ↓
+
+  Runtime 写入 worker_log
+
+  ↓
+
+  Runtime 执行 Stage 流转
+
+【8. 模块边界】
+
+Worker 负责：
+
+1. 执行 plan。
+
+2. 根据 plan_request_group 发起资源请求。
+
+3. 整理 Runtime 返回的 Resource Response。
+
+4. 生成标准 information。
+
+5. 生成 worker_log 对应的 log_content。
+
+Worker 不负责：
+
+1. 不生成 Goal。
+
+2. 不生成 Plan。
+
+3. 不判断 Domain。
+
+4. 不生成 Result。
+
+5. 不生成 Message。
+
+6. 不执行 Quality 验证。
+
+7. 不修改 Store。
+
+8. 不修改 Log。
+
+9. 不修改 Stage。
+
+10. 不决定 Failure Handling。
+
+11. 不直接访问外部系统。
+
+12. 不直接访问 Data Center。
+
+【9. 生命周期边界】
+
+Worker 生命周期只存在于 WORKER_EXECUTING Stage 的一次模块执行中。
+
+Worker 执行完成后，当前模块上下文结束。是否进入
+WRITER_GENERATING、WORKER_FAILED 或 Recovery Policy 分支，由 Runtime
+根据输出校验、资源结果、写入结果和 Stage 规则决定。
+
+【10. 未来扩展规则】
+
+MVP 阶段 Worker 为代码模块。未来可以扩展为：
+
+1. 单个 Worker Agent。
+
+2. 多个 Worker Agent 组成的执行组。
+
+3. 工具调用组合。
+
+4. 外部执行服务。
+
+扩展时不改变 Runtime
+主流程。所有实现都必须保持相同输入、相同资源请求方式、相同 Module Output
+Envelope、相同 Store / Log 写入归属。
+
+【收束定义】
+
+Worker 是 WORKER_EXECUTING Stage 的执行模块。它根据 Runtime 注入的 Plan
+和 Plan Request Group，向 Runtime 申请资源，整理 Resource Response，生成
+information，并将输出返回 Runtime。Worker 不直接访问资源，不直接写 Store
+/ Log，不控制 Stage，不处理失败收束。
