@@ -1,0 +1,13 @@
+[project]
+name = "kernel-runtime-v2"
+version = "6.0.0"
+requires-python = ">=3.11"
+dependencies = [
+  "openai>=1.0",
+]
+
+[project.optional-dependencies]
+preproduction = ["fastapi>=0.110", "uvicorn>=0.29", "redis>=5.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,16 @@
+{
+  "version": "6.0.0",
+  "baseline": "V5.5 accepted",
+  "release_type": "real-platform-authorization-boundary",
+  "automated_tests": 68,
+  "load_test": {
+    "mode": "fake_llm_sanitized_zero_token",
+    "tasks": 500,
+    "concurrency": 24,
+    "completed": 500,
+    "failed": 0
+  },
+  "real_data_included": false,
+  "real_delivery_enabled": false,
+  "secrets_included": false
+}

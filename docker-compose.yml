@@ -1,0 +1,26 @@
+services:
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+  runtime-api:
+    build: .
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      RUNTIME_DB_PATH: /data/runtime.db
+      REAL_LLM_ENABLED: "false"
+      RUNTIME_WORKERS: "4"
+      RUNTIME_MAX_ACTIVE: "8"
+    volumes:
+      - runtime-data:/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+volumes:
+  runtime-data:
